@@ -20,7 +20,7 @@ let success = run([
       it(
         "should add a number to counter",
         do {
-          let response = await day1Actor.add(2.0);
+          let response = await day1Actor.add(3.0);
           assertTrue(response == 3.0);
         },
       ),
