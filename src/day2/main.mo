@@ -29,7 +29,6 @@ actor class Homework() {
       case (result) return #ok();
     };
     return #err("Invalid homework ID");
-
   };
 
   public shared func deleteHomework(id : Nat) : async Result.Result<(), Text> {
@@ -49,13 +48,16 @@ actor class Homework() {
       case (?result) result;
     };
 
-    let homeworkComplete : Type.Homework = {
+    let homeworkComplete : Homework = {
       title = hw.title;
       description = hw.description;
       dueDate = hw.dueDate;
       completed = true;
     };
-    return await updateHomework(id, homeworkComplete);
+
+    switch (homeworkDiary.put(id, homeworkComplete)) {
+      case (result) return #ok();
+    };
   };
 
   public shared query func getPendingHomework() : async [Homework] {
