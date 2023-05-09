@@ -3,39 +3,72 @@ import Result "mo:base/Result";
 import Array "mo:base/Array";
 
 import Type "Types";
+import Time "mo:base/Time";
+import Bool "mo:base/Bool";
+import Text "mo:base/Text";
 
 actor class Homework() {
   type Homework = Type.Homework;
+  var homeworkDiary = Buffer.Buffer<Homework>(5);
 
   public shared func addHomework(homework : Homework) : async Nat {
-    return 9;
+    let index = homeworkDiary.size();
+    homeworkDiary.add(homework);
+    return index;
   };
 
   public shared query func getHomework(id : Nat) : async Result.Result<Homework, Text> {
-    return #err("not implemented");
+    switch (homeworkDiary.getOpt(id)) {
+      case null #err("Invalid homework ID");
+      case (?result) #ok(result);
+    };
   };
 
   public shared func updateHomework(id : Nat, homework : Homework) : async Result.Result<(), Text> {
-    return #err("not implemented");
+    var hw = switch (homeworkDiary.put(id, homework)) {
+      case (result) return #ok();
+    };
+    return #err("Invalid homework ID");
+
   };
 
   public shared func deleteHomework(id : Nat) : async Result.Result<(), Text> {
-    return #err("not implemented");
+    switch (homeworkDiary.remove(id)) {
+      case (result) return #ok();
+    };
+    return #err("Invalid homework ID");
   };
 
   public shared query func getAllHomework() : async [Homework] {
-    return [];
+    return Buffer.toArray<Homework>(homeworkDiary);
   };
 
   public shared func markAsCompleted(id : Nat) : async Result.Result<(), Text> {
-    return #err("not implemented");
+    var hw = switch (homeworkDiary.getOpt(id)) {
+      case null return #err("Invalid homework ID");
+      case (?result) result;
+    };
+
+    let homeworkComplete : Type.Homework = {
+      title = hw.title;
+      description = hw.description;
+      dueDate = hw.dueDate;
+      completed = true;
+    };
+    return await updateHomework(id, homeworkComplete);
   };
 
   public shared query func getPendingHomework() : async [Homework] {
-    return [];
+    return Array.filter<Homework>(Buffer.toArray(homeworkDiary), func x = Bool.lognot(x.completed));
   };
 
   public shared query func searchHomework(searchTerm : Text) : async [Homework] {
-    return [];
+    return Array.filter<Homework>(
+      Buffer.toArray(homeworkDiary),
+      func x = Bool.logor(
+        Text.contains(x.title, #text searchTerm),
+        Text.contains(x.description, #text searchTerm),
+      ),
+    );
   };
 };
