@@ -43,20 +43,18 @@ actor class Homework() {
   };
 
   public shared func markAsCompleted(id : Nat) : async Result.Result<(), Text> {
-    var hw = switch (homeworkDiary.getOpt(id)) {
+    switch (homeworkDiary.getOpt(id)) {
       case null return #err("Invalid homework ID");
-      case (?result) result;
-    };
-
-    let homeworkComplete : Homework = {
-      title = hw.title;
-      description = hw.description;
-      dueDate = hw.dueDate;
-      completed = true;
-    };
-
-    switch (homeworkDiary.put(id, homeworkComplete)) {
-      case (result) return #ok();
+      case (?result) {
+        let homeworkComplete : Homework = {
+          title = result.title;
+          description = result.description;
+          dueDate = result.dueDate;
+          completed = true;
+        };
+        homeworkDiary.put(id, homeworkComplete);
+        return #ok();
+      };
     };
   };
 
