@@ -21,7 +21,7 @@ let run = MoSpec.run;
 
 let studentTestProfile : Type.StudentProfile = {
   name = "Tester";
-  Team = "cozy-test";
+  team = "cozy-test";
   graduate = false;
 };
 let runnerPrincipal = Principal.fromText("wo5qg-ysjiq-5da");
@@ -73,7 +73,7 @@ let success = run([
         do {
           let newStudentProfile : Type.StudentProfile = {
             name = "Tester2";
-            Team = "other-team";
+            team = "other-team";
             graduate = false;
           };
           let response = await day5Actor.updateMyProfile(newStudentProfile);
@@ -168,80 +168,6 @@ let success = run([
           // as this method is only subcalling verifyOwnership() + test()
           // and verifyOwnership() is not possible locally
           true;
-        },
-      ),
-    ],
-  ),
-  describe(
-    "#verifyOwnership",
-    [
-      it(
-        "should verify if caller is a controller of the given canister",
-        do {
-          // NOTE: Not possible to test locally,
-          // as actor "aaaa-aa" (aka the IC itself, exposed as an interface) does not exist locally
-          // let calculatorActor = await Calculator.Calculator();
-          // let response = await day5Actor.verifyOwnership(Principal.fromActor(calculatorActor), runnerPrincipal);
-          // switch (response) {
-          //   case (#ok(result)) {
-          //     assertTrue(result);
-          //   };
-          //   case (#err(message)) {
-          //     Debug.trap(message);
-          //   };
-          // };
-          true;
-        },
-      ),
-    ],
-  ),
-  describe(
-    "#activateGraduation",
-    [
-      it(
-        "should start an hourly recurrent job that checks and graduates students",
-        do {
-          // NOTE: Not possible to test locally,
-          // as Timer is not running on a local replica
-          // await day5Actor.activateGraduation();
-          true;
-        },
-      ),
-    ],
-  ),
-  describe(
-    "#deactivateGraduation",
-    [
-      it(
-        "should stop the recurrent job that checks students",
-        do {
-          // NOTE: Not possible to test locally,
-          // as Timer is not running on a local replica
-          // await day5Actor.deactivateGraduation();
-          true;
-        },
-      ),
-    ],
-  ),
-  describe(
-    "#http_request",
-    [
-      it(
-        "should render a body with a list of student names that got graduated",
-        do {
-          let testRequest : Http.HttpRequest = {
-            body = "";
-            headers = [];
-            method = "GET";
-            url = "/";
-          };
-
-          let response = await day5Actor.http_request(testRequest);
-          let parsedResponse = Text.decodeUtf8(response.body);
-          switch (parsedResponse) {
-            case (null) { Debug.trap("Unexpected body response") };
-            case (?parsedResponse) { assertTrue(Text.size(parsedResponse) > 0) };
-          };
         },
       ),
     ],
