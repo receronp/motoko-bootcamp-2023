@@ -7,6 +7,7 @@ module {
   };
 
   public type Message = {
+    id : Nat;
     content : Content;
     vote : Int;
     creator : Principal;

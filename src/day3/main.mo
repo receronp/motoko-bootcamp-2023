@@ -17,16 +17,31 @@ actor class StudentWall() {
   type Survey = Type.Survey;
   type Answer = Type.Answer;
 
-  var messageId : Nat = 0;
-  let wall = HashMap.HashMap<Text, Message>(1, Text.equal, Text.hash);
+  private stable var messageId : Nat = 0;
+  private stable var wallEntries : [(Text, Message)] = [];
+  private var wall = HashMap.HashMap<Text, Message>(1, Text.equal, Text.hash);
+
+  system func preupgrade() {
+    wallEntries := Iter.toArray(wall.entries());
+  };
+
+  system func postupgrade() {
+    wall := HashMap.fromIter<Text, Message>(
+      wallEntries.vals(),
+      1,
+      Text.equal,
+      Text.hash,
+    );
+  };
 
   public shared ({ caller }) func writeMessage(c : Content) : async Nat {
+    let index = messageId;
     let message : Message = {
+      id = index;
       content = c;
       vote = 0;
       creator = caller;
     };
-    let index = messageId;
     wall.put(Nat.toText(index), message);
     messageId += 1;
     return index;
@@ -47,6 +62,7 @@ actor class StudentWall() {
 
     if (Principal.equal(message.creator, caller)) {
       message := {
+        id = message.id;
         content = c;
         vote = message.vote;
         creator = message.creator;
@@ -67,6 +83,7 @@ actor class StudentWall() {
 
   private func addVote(messageId : Nat, message : Message, vote : Int) : () {
     let m = {
+      id = message.id;
       content = message.content;
       vote = message.vote + vote;
       creator = message.creator;
@@ -116,5 +133,77 @@ actor class StudentWall() {
         };
       },
     );
+  };
+
+  func toSurvey(c : Content) : Survey {
+    switch c {
+      case (#Survey { title; answers }) {
+        return {
+          title = title;
+          answers = answers;
+        };
+      };
+      case (_) return { title = ""; answers = [] };
+    };
+  };
+
+  func updateSurvey(messageId : Nat, message : Message, survey : Survey, buf : Buffer.Buffer<Answer>) : () {
+    let s = {
+      title = survey.title;
+      answers = Buffer.toArray<Answer>(buf);
+    };
+
+    let m = {
+      id = message.id;
+      content = #Survey s;
+      vote = message.vote;
+      creator = message.creator;
+    };
+
+    wall.put(Nat.toText(messageId), m);
+    return;
+  };
+
+  public shared func surveyAnswer(messageId : Nat, answer : Answer) : async Result.Result<(), Text> {
+    var message : Message = switch (wall.get(Nat.toText(messageId))) {
+      case null return #err("Invalid message ID");
+      case (?result) result;
+    };
+
+    var survey : Survey = toSurvey(message.content);
+
+    switch (survey.title) {
+      case "" return #err("Message does not contain survey");
+      case (_) {
+        let buf = Buffer.fromArray<Answer>(survey.answers);
+        buf.add(answer);
+        updateSurvey(messageId, message, survey, buf);
+        return #ok();
+      };
+    };
+  };
+
+  public shared func surveyVote(messageId : Nat, answer_index : Nat) : async Result.Result<(), Text> {
+    var message : Message = switch (wall.get(Nat.toText(messageId))) {
+      case null return #err("Invalid message ID");
+      case (?result) result;
+    };
+
+    var survey : Survey = toSurvey(message.content);
+
+    switch (survey.title) {
+      case "" return #err("Message does not contain survey");
+      case (_) {
+        let buf = Buffer.fromArray<Answer>(survey.answers);
+        switch (buf.getOpt(answer_index)) {
+          case null return #err("Index out of bounds for this survey");
+          case (?answer) {
+            buf.put(answer_index, (answer.0, answer.1 + 1));
+            updateSurvey(messageId, message, survey, buf);
+            return #ok();
+          };
+        };
+      };
+    };
   };
 };
