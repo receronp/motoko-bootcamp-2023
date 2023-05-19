@@ -1,22 +1,27 @@
 import Type "Types";
+import Outcalls "Outcalls";
 import Buffer "mo:base/Buffer";
 import Result "mo:base/Result";
 import Array "mo:base/Array";
 import Iter "mo:base/Iter";
 import HashMap "mo:base/HashMap";
 import Nat "mo:base/Nat";
-import Nat32 "mo:base/Nat32";
 import Text "mo:base/Text";
 import Principal "mo:base/Principal";
 import List "mo:base/List";
 import Int "mo:base/Int";
+import Blob "mo:base/Blob";
+import Cycles "mo:base/ExperimentalCycles";
+import Timer "mo:base/Timer";
+import JSON "mo:json.mo";
 
-actor class StudentWall() {
+shared (msg) actor class StudentWall() {
   type Message = Type.Message;
   type Content = Type.Content;
   type Survey = Type.Survey;
   type Answer = Type.Answer;
 
+  private stable let owner = msg.caller;
   private stable var messageId : Nat = 0;
   private stable var wallEntries : [(Text, Message)] = [];
   private var wall = HashMap.HashMap<Text, Message>(1, Text.equal, Text.hash);
@@ -206,4 +211,95 @@ actor class StudentWall() {
       };
     };
   };
+
+  stable var price : Text = "N/A";
+  stable var fiveMinutely : Timer.TimerId = 0;
+
+  public shared (msg) func startTimer() : () {
+    assert (owner == msg.caller);
+    fiveMinutely := Timer.recurringTimer(#seconds(60 * 5), retrievePrice);
+  };
+
+  public shared (msg) func stopTimer() : () {
+    assert (owner == msg.caller);
+    Timer.cancelTimer(fiveMinutely);
+  };
+
+  public shared query func getPrice() : async Text {
+    return price;
+  };
+
+  public query func transform(raw : Outcalls.TransformArgs) : async Outcalls.CanisterHttpResponsePayload {
+    let transformed : Outcalls.CanisterHttpResponsePayload = {
+      status = raw.response.status;
+      body = raw.response.body;
+      headers = [
+        {
+          name = "Content-Security-Policy";
+          value = "default-src 'self'";
+        },
+        { name = "Referrer-Policy"; value = "strict-origin" },
+        { name = "Permissions-Policy"; value = "geolocation=(self)" },
+        {
+          name = "Strict-Transport-Security";
+          value = "max-age=63072000";
+        },
+        { name = "X-Frame-Options"; value = "DENY" },
+        { name = "X-Content-Type-Options"; value = "nosniff" },
+      ];
+    };
+    transformed;
+  };
+
+  private func retrievePrice() : async () {
+    let transform_context : Outcalls.TransformContext = {
+      function = transform;
+      context = Blob.fromArray([]);
+    };
+
+    // Construct canister request
+    let request : Outcalls.CanisterHttpRequestArgs = {
+      url = "https://api.binance.com/api/v3/avgPrice?symbol=ICPUSDT";
+      max_response_bytes = null;
+      headers = [];
+      body = null;
+      method = #get;
+      transform = ?transform_context;
+    };
+    Cycles.add(20_000_000_000);
+    let ic : Outcalls.IC = actor ("aaaaa-aa");
+    let response : Outcalls.CanisterHttpResponsePayload = await ic.http_request(request);
+    price := decode_body_to_price(response);
+  };
+
+  private func decode_body_to_price(result : Outcalls.CanisterHttpResponsePayload) : (Text) {
+
+    switch (Text.decodeUtf8(Blob.fromArray(result.body))) {
+      case null { return "Payload Error" };
+      case (?decoded) {
+        for (entry in Text.split(decoded, #text "[")) {
+          switch (JSON.parse(entry)) {
+            case null { return "Parse Error" };
+            case (?json) {
+              switch (json) {
+                case (#Object(json)) {
+                  for (item in json.vals()) {
+                    switch (item) {
+                      case ("price", #String(price)) {
+                        return price;
+                      };
+                      case (_) {};
+                    };
+                  };
+                };
+                case (_) { return "Not an Object" };
+              };
+            };
+          };
+        };
+      };
+    };
+    return "N/A";
+  };
+
 };
